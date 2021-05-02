@@ -1,0 +1,429 @@
+---
+title: "DataFest21"
+author: "Alexander MacKenzie"
+date: "29/04/2021"
+output: pdf_document
+---
+
+```{r, include=FALSE}
+#install.packages(c("tidyverse", "dplyr", "arsenal"))
+library(tidyverse)
+library(dplyr)
+library(arsenal)
+library(knitr)
+library(gridExtra)
+library(ggpubr)
+
+CA <- read_csv("/Users/alexandermackenzie/CA-Data/ca.csv")
+#CA
+```
+
+# Data Wrangling
+
+```{r, warning=FALSE}
+CA_clean <- read_csv("/Users/alexandermackenzie/CA-Data/cleaned_ca.csv")
+NMU <- read_csv("/Users/alexandermackenzie/CA-Data/y.csv")
+preds <- read_csv("/Users/alexandermackenzie/CA-Data/X.csv")
+
+CA_NMU <- left_join(CA_clean, NMU, by = "X1")
+#summary(comparedf(CA, CA_clean))
+#X1 and DEM_PREGMTH are not common
+
+#^ Used for visualization and other purposes (non-model)
+
+CA_NMU_fit <- left_join(preds, NMU, by = "X1")
+CA_NMU_fit <- data.frame(CA_NMU_fit)
+TOB_FREQ <- as.factor(CA_NMU_fit$TOB_FREQ_USE)
+ALC_FREQ <- as.factor(CA_NMU_fit$ALC_FREQ_USE)
+CAN_REC <- as.factor(CA_NMU_fit$CAN_REC_USE)
+CAN_MED <- as.factor(CA_NMU_fit$CAN_MED_USE)
+CAN_ALL <- as.factor(CA_NMU_fit$CAN_USE)
+COKE <- as.factor(CA_NMU_fit$COKE_USE)
+CRACK <- as.factor(CA_NMU_fit$CRACK_USE)
+MDMA <- as.factor(CA_NMU_fit$MDMA_USE)
+GHB <- as.factor(CA_NMU_fit$GHB_USE)
+HAL <- as.factor(CA_NMU_fit$HAL_USE)
+INH <- as.factor(CA_NMU_fit$INH_USE) 
+SPEED <- as.factor(CA_NMU_fit$SPEED_USE)
+NPFENT <- as.factor(CA_NMU_fit$NPFENT_USE)
+HEROIN <- as.factor(CA_NMU_fit$HEROIN_USE)
+KET <- as.factor(CA_NMU_fit$KET_USE)
+MEPH <- as.factor(CA_NMU_fit$MEPH_USE)
+SPICE <- as.factor(CA_NMU_fit$SPICE_USE)
+SAL <- as.factor(CA_NMU_fit$SAL_USE)
+STEROID <- as.factor(CA_NMU_fit$STER_USE)
+CA_NMU_fit <- CA_NMU_fit %>% select(-c(TOB_FREQ_USE, ALC_FREQ_USE, CAN_REC_USE, CAN_MED_USE, CAN_USE, COKE_USE, CRACK_USE, MDMA_USE, GHB_USE, HAL_USE, INH_USE, SPEED_USE, NPFENT_USE, HEROIN_USE, KET_USE, MEPH_USE, SPICE_USE, SAL_USE, STER_USE)) %>% mutate(TOB_FREQ, ALC_FREQ, CAN_REC, CAN_MED, CAN_ALL, COKE, CRACK, MDMA, GHB, HAL, INH, SPEED, NPFENT, HEROIN, KET, MEPH, SPICE, SAL, STEROID)
+CA_NMU_fit <- CA_NMU_fit %>% mutate(TOB_FREQ = fct_relevel(TOB_FREQ, levels = c("3", "2", "1"))) %>% mutate(ALC_FREQ = fct_relevel(ALC_FREQ, levels = c("8", "7", "6", "5", "4", "3", "2", "1"))) %>% mutate(CAN_REC = fct_relevel(CAN_REC, levels = c("1", "5", "4", "3", "2"))) %>% mutate(CAN_MED = fct_relevel(CAN_MED, levels = c("1", "5", "4", "3", "2"))) %>% mutate(CAN_ALL = fct_relevel(CAN_ALL, levels = c("1", "5", "4", "3", "2"))) %>% mutate(COKE = fct_relevel(COKE, levels = c("1", "5", "4", "3", "2"))) %>% mutate(CRACK = fct_relevel(CRACK, levels = c("1", "5", "4", "3", "2"))) %>% mutate(MDMA = fct_relevel(MDMA, levels = c("1", "5", "4", "3", "2"))) %>% mutate(GHB = fct_relevel(GHB, levels = c("1", "5", "4", "3", "2"))) %>% mutate(HAL = fct_relevel(HAL, levels = c("1", "5", "4", "3", "2"))) %>% mutate(INH = fct_relevel(INH, levels = c("1", "5", "4", "3", "2"))) %>% mutate(SPEED = fct_relevel(SPEED, levels = c("1", "5", "4", "3", "2"))) %>% mutate(NPFENT = fct_relevel(NPFENT, levels = c("1", "5", "4", "3", "2"))) %>% mutate(HEROIN = fct_relevel(HEROIN, levels = c("1", "5", "4", "3", "2"))) %>% mutate(KET = fct_relevel(KET, levels = c("1", "5", "4", "3", "2"))) %>% mutate(MEPH = fct_relevel(MEPH, levels = c("1", "5", "4", "3", "2"))) %>% mutate(SPICE = fct_relevel(SPICE, levels = c("1", "5", "4", "3", "2"))) %>% mutate(SAL = fct_relevel(SAL, levels = c("1", "5", "4", "3", "2"))) %>% mutate(STEROID = fct_relevel(STEROID, levels = c("1", "5", "4", "3", "2")))
+```
+
+# Initial Model Fitting for Smoking & Drinking
+
+```{r, warning=FALSE}
+#CA_NMU %>% select(TOB_FREQ_USE) %>% group_by(TOB_FREQ_USE) %>% summarise(n())
+
+SMOKE_NMU_TABLE <- CA_NMU %>% select(TOB_FREQ_USE, NMU) %>% group_by(TOB_FREQ_USE, NMU) %>% summarise(freq = n())
+SMOKE_NMU_TABLE$NMU[SMOKE_NMU_TABLE$NMU == 0] <- "No"
+SMOKE_NMU_TABLE$NMU[SMOKE_NMU_TABLE$NMU == 1] <- "Yes"
+SMOKE_NMU_TABLE$TOB_FREQ_USE[SMOKE_NMU_TABLE$TOB_FREQ_USE == 1] <- "Every Day"
+SMOKE_NMU_TABLE$TOB_FREQ_USE[SMOKE_NMU_TABLE$TOB_FREQ_USE == 2] <- "Occasionally"
+SMOKE_NMU_TABLE$TOB_FREQ_USE[SMOKE_NMU_TABLE$TOB_FREQ_USE == 3] <- "Not At All"
+
+positions1 <- c("Not At All", "Occasionally", "Every Day")
+
+generalFit <- glm(NMU ~ TOB_FREQ, family = binomial(link = "logit"), data = CA_NMU_fit)
+summary(generalFit)
+
+
+```
+
+# Data Visualizations for Smoking Groups
+
+```{r, warning=FALSE}
+RELIEV_MISUSE <- CA_NMU %>% select(27:51) %>% select(ends_with("_NMU"))
+RELIEV_MISUSE <- RELIEV_MISUSE %>% mutate(RELI_NMU = ifelse(rowSums(RELIEV_MISUSE) > 0, 1, 0)) %>% select(RELI_NMU)
+
+STIM_MISUSE <- CA_NMU %>% select(STIM_NMU)
+
+BENZ_MISUSE <- CA_NMU %>% select(BENZ_NMU)
+
+THC_MISUSE <- CA_NMU %>% select(THC_NMU)
+
+#TOB_FREQ_USE is column 59
+SMOKE <- CA_NMU %>% select(59)
+DRINK <- CA_NMU %>% select(60)
+DEMOGR <- CA_NMU %>% select(1:26)
+CAN_REC <- CA_NMU %>% select(CAN_REC_USE)
+AMPH_REC <- CA_NMU %>% select(SPEED_USE)
+FENT_REC <- CA_NMU %>% select(NPFENT_USE)
+STER_REC <- CA_NMU %>% select(STER_USE)
+SMOKE_DRUGGRP <- bind_cols(DEMOGR, SMOKE, DRINK, RELIEV_MISUSE, STIM_MISUSE, BENZ_MISUSE, THC_MISUSE, CAN_REC, AMPH_REC, FENT_REC, STER_REC)
+
+SMOKE_DRUGGRP$TOB_FREQ_USE[SMOKE_DRUGGRP$TOB_FREQ_USE == 1] <- "Every Day"
+SMOKE_DRUGGRP$TOB_FREQ_USE[SMOKE_DRUGGRP$TOB_FREQ_USE == 2] <- "Occasionally"
+SMOKE_DRUGGRP$TOB_FREQ_USE[SMOKE_DRUGGRP$TOB_FREQ_USE == 3] <- "Not At All"
+SMOKE_DRUGGRP$ALC_FREQ_USE[SMOKE_DRUGGRP$ALC_FREQ_USE == 1] <- "6-7/wk"
+SMOKE_DRUGGRP$ALC_FREQ_USE[SMOKE_DRUGGRP$ALC_FREQ_USE == 2] <- "4-5/wk"
+SMOKE_DRUGGRP$ALC_FREQ_USE[SMOKE_DRUGGRP$ALC_FREQ_USE == 3] <- "2-3/wk"
+SMOKE_DRUGGRP$ALC_FREQ_USE[SMOKE_DRUGGRP$ALC_FREQ_USE == 4] <- "1/wk"
+SMOKE_DRUGGRP$ALC_FREQ_USE[SMOKE_DRUGGRP$ALC_FREQ_USE == 5] <- "2-3/mth"
+SMOKE_DRUGGRP$ALC_FREQ_USE[SMOKE_DRUGGRP$ALC_FREQ_USE == 6] <- "1/mth"
+SMOKE_DRUGGRP$ALC_FREQ_USE[SMOKE_DRUGGRP$ALC_FREQ_USE == 7] <- "<1/mth"
+SMOKE_DRUGGRP$ALC_FREQ_USE[SMOKE_DRUGGRP$ALC_FREQ_USE == 8] <- "Never"
+
+SMOKE_DRUGGRP$RELI_NMU[SMOKE_DRUGGRP$RELI_NMU == 0] <- "No"
+SMOKE_DRUGGRP$RELI_NMU[SMOKE_DRUGGRP$RELI_NMU == 1] <- "Yes"
+SMOKE_DRUGGRP$STIM_NMU[SMOKE_DRUGGRP$STIM_NMU == 0] <- "No"
+SMOKE_DRUGGRP$STIM_NMU[SMOKE_DRUGGRP$STIM_NMU == 1] <- "Yes"
+SMOKE_DRUGGRP$BENZ_NMU[SMOKE_DRUGGRP$BENZ_NMU == 0] <- "No"
+SMOKE_DRUGGRP$BENZ_NMU[SMOKE_DRUGGRP$BENZ_NMU == 1] <- "Yes"
+SMOKE_DRUGGRP$THC_NMU[SMOKE_DRUGGRP$THC_NMU == 0] <- "No"
+SMOKE_DRUGGRP$THC_NMU[SMOKE_DRUGGRP$THC_NMU == 1] <- "Yes"
+
+
+REC_CAN_REC <- as.factor(SMOKE_DRUGGRP$CAN_REC_USE)
+REC_AMPH_REC <- as.factor(SMOKE_DRUGGRP$SPEED_USE)
+NPFENT <- as.factor(SMOKE_DRUGGRP$NPFENT_USE)
+STER <- as.factor(SMOKE_DRUGGRP$STER_USE)
+SMOKE_DRUGGRP <- SMOKE_DRUGGRP %>% select(-c(CAN_REC_USE, SPEED_USE, NPFENT_USE, STER_USE)) %>% mutate(REC_CAN_REC, REC_AMPH_REC, NPFENT, STER)
+
+SMOKE_DRUGGRP <- SMOKE_DRUGGRP %>% mutate(REC_CAN_REC = fct_relevel(REC_CAN_REC, levels = c("1", "5", "4", "3", "2"))) %>% mutate(REC_AMPH_REC = fct_relevel(REC_AMPH_REC, levels = c("1", "5", "4", "3", "2"))) %>% mutate(NPFENT = fct_relevel(NPFENT, levels = c("1", "5", "4", "3", "2"))) %>% mutate(STER = fct_relevel(STER, levels = c("1", "5", "4", "3", "2")))
+
+levels(SMOKE_DRUGGRP$REC_CAN_REC) <- c("Never", "Within Lifetime", "Within Last Year", "Within Last Month", "Within Last Week")
+levels(SMOKE_DRUGGRP$REC_AMPH_REC) <- c("Never", "Within Lifetime", "Within Last Year", "Within Last Month", "Within Last Week")
+levels(SMOKE_DRUGGRP$NPFENT) <- c("Never", "Within Lifetime", "Within Last Year", "Within Last Month", "Within Last Week")
+levels(SMOKE_DRUGGRP$STER) <- c("Never", "Within Lifetime", "Within Last Year", "Within Last Month", "Within Last Week")
+
+
+bold.text <- element_text(face = "bold", color = "black")
+#my_color <- c("#37507D", "#2BA0AA", "#AED7DD", "#981C1C", "#F7723D")
+my_color <- c("#981C1C", "#EC8A6F", "#F3C2C2", "#37507D", "#2BA0AA")
+
+SMOKE_FREQ_TABLE <- SMOKE_DRUGGRP %>% group_by(TOB_FREQ_USE) %>% summarise(number_cases = n())
+DRINK_FREQ_TABLE <- SMOKE_DRUGGRP %>% group_by(ALC_FREQ_USE) %>% summarise(number_cases = n())
+SMOKE_GENDER_FREQ_TABLE <- SMOKE_DRUGGRP %>% group_by(DEM_GENDER, TOB_FREQ_USE) %>% summarise(number_cases = n())
+DRINK_GENDER_FREQ_TABLE <- SMOKE_DRUGGRP %>% group_by(DEM_GENDER, ALC_FREQ_USE) %>% summarise(number_cases = n())
+
+DRINK_GENDER_FREQ_TABLE$DEM_GENDER[DRINK_GENDER_FREQ_TABLE$DEM_GENDER == 1] <- "Male"
+DRINK_GENDER_FREQ_TABLE$DEM_GENDER[DRINK_GENDER_FREQ_TABLE$DEM_GENDER == 2] <- "Female"
+
+SMOKE_GENDER_FREQ_TABLE$DEM_GENDER[SMOKE_GENDER_FREQ_TABLE$DEM_GENDER == 1] <- "Male"
+SMOKE_GENDER_FREQ_TABLE$DEM_GENDER[SMOKE_GENDER_FREQ_TABLE$DEM_GENDER == 2] <- "Female"
+
+
+smoke_nmu_plot <- ggplot(SMOKE_NMU_TABLE, aes(fill = NMU, y = freq, x = TOB_FREQ_USE)) + geom_bar(position="fill", stat="identity") + theme_minimal() + labs(x = "Smoking Frequency", y = "Proportion", title = "Non-Medical Use of Any Drug by Smoking Frequency", subtitle = "(Taller bars indicate higher non-medical drug use %. Smoking group sample sizes shown.)") + scale_x_discrete(limits = positions1) + geom_text(data = SMOKE_FREQ_TABLE, aes(x = TOB_FREQ_USE, y = 0.925, label = number_cases), size = 5, colour = "white", inherit.aes = FALSE) + scale_fill_manual(values=my_color)
+smoke_nmu_plot
+
+SMOKE_RELI_TABLE <- SMOKE_DRUGGRP %>% select(TOB_FREQ_USE, RELI_NMU) %>% group_by(TOB_FREQ_USE, RELI_NMU) %>% summarise(freq = n())
+
+smoke_reli_plot <- ggplot(SMOKE_RELI_TABLE, aes(fill = RELI_NMU, y = freq, x = TOB_FREQ_USE)) + geom_bar(position="fill", stat="identity") + theme_minimal() + labs(x = "Smoking Frequency", y = "Proportion", title = "Non-Medical Use of Prescribed Analgesics by Smoking Frequency", subtitle = "(Taller bars indicate higher non-medical drug use %. Smoking group sample sizes shown.)") + scale_x_discrete(limits = positions1) + geom_text(data = SMOKE_FREQ_TABLE, aes(x = TOB_FREQ_USE, y = 0.925, label = number_cases), size = 5, colour = "white", inherit.aes = FALSE) + scale_fill_manual(values=my_color)
+smoke_reli_plot
+
+SMOKE_STIM_TABLE <- SMOKE_DRUGGRP %>% select(TOB_FREQ_USE, STIM_NMU) %>% group_by(TOB_FREQ_USE, STIM_NMU) %>% summarise(freq = n())
+
+smoke_stim_plot <- ggplot(SMOKE_STIM_TABLE, aes(fill = STIM_NMU, y = freq, x = TOB_FREQ_USE)) + geom_bar(position="fill", stat="identity") + theme_minimal() + labs(x = "Smoking Frequency", y = "Proportion", title = "Non-Medical Use of Prescribed Stimulants by Smoking Frequency", subtitle = "(Taller bars indicate higher non-medical drug use %. Smoking group sample sizes shown.)") + scale_x_discrete(limits = positions1) + coord_cartesian(ylim = c(0, 0.1)) + geom_text(data = SMOKE_FREQ_TABLE, aes(x = TOB_FREQ_USE, y = 0.0925, label = number_cases), size = 5, colour = "white", inherit.aes = FALSE) + theme(axis.text.y = bold.text) + scale_fill_manual(values=my_color)
+smoke_stim_plot
+
+SMOKE_BENZ_TABLE <- SMOKE_DRUGGRP %>% select(TOB_FREQ_USE, BENZ_NMU) %>% group_by(TOB_FREQ_USE, BENZ_NMU) %>% summarise(freq = n())
+
+smoke_benz_plot <- ggplot(SMOKE_BENZ_TABLE, aes(fill = BENZ_NMU, y = freq, x = TOB_FREQ_USE)) + geom_bar(position="fill", stat="identity") + theme_minimal() + labs(x = "Smoking Frequency", y = "Proportion", title = "Non-Medical Use of Prescribed Benzodiazapines by Smoking Frequency", subtitle = "(Taller bars indicate higher non-medical drug use %. Smoking group sample sizes shown.)") + scale_x_discrete(limits = positions1) + coord_cartesian(ylim = c(0, 0.1)) + geom_text(data = SMOKE_FREQ_TABLE, aes(x = TOB_FREQ_USE, y = 0.0925, label = number_cases), size = 5, colour = "white", inherit.aes = FALSE) + theme(axis.text.y = bold.text) + scale_fill_manual(values=my_color)
+smoke_benz_plot
+
+SMOKE_THC_TABLE <- SMOKE_DRUGGRP %>% select(TOB_FREQ_USE, THC_NMU) %>% group_by(TOB_FREQ_USE, THC_NMU) %>% summarise(freq = n())
+
+smoke_thc_plot <- ggplot(SMOKE_THC_TABLE, aes(fill = THC_NMU, y = freq, x = TOB_FREQ_USE)) + geom_bar(position="fill", stat="identity") + theme_minimal() + labs(x = "Smoking Frequency", y = "Proportion", title = "Non-Medical Use of Prescribed THC/Cannabinoid by Smoking Frequency", subtitle = "(Taller bars indicate higher non-medical drug use %. Smoking group sample sizes shown.)") + scale_x_discrete(limits = positions1) + coord_cartesian(ylim = c(0, 0.1)) + geom_text(data = SMOKE_FREQ_TABLE, aes(x = TOB_FREQ_USE, y = 0.0925, label = number_cases), size = 5, colour = "white", inherit.aes = FALSE) + theme(axis.text.y = bold.text) + scale_fill_manual(values=my_color)
+smoke_thc_plot
+
+SMOKE_CANREC_TABLE <- SMOKE_DRUGGRP %>% select(TOB_FREQ_USE, REC_CAN_REC) %>% group_by(TOB_FREQ_USE, REC_CAN_REC) %>% summarise(freq = n())
+
+
+
+smoke_canrec_plot <- ggplot(SMOKE_CANREC_TABLE, aes(fill = REC_CAN_REC, y = freq, x = TOB_FREQ_USE)) + geom_bar(position="fill", stat="identity") + theme_minimal() + labs(x = "Smoking Frequency", y = "Proportion", title = "Non-Medical Use of Non-Prescribed Cannabis by Smoking Frequency", subtitle = "(Taller bars indicate higher non-medical drug use %. Smoking group sample sizes shown.)") + scale_x_discrete(limits = positions1) + scale_fill_manual(values=my_color) + geom_text(data = SMOKE_FREQ_TABLE, aes(x = TOB_FREQ_USE, y = 0.925, label = number_cases), size = 5, colour = "white", inherit.aes = FALSE)
+smoke_canrec_plot
+
+SMOKE_AMPHREC_TABLE <- SMOKE_DRUGGRP %>% select(TOB_FREQ_USE, REC_AMPH_REC) %>% group_by(TOB_FREQ_USE, REC_AMPH_REC) %>% summarise(freq = n())
+
+smoke_amphrec_plot <- ggplot(SMOKE_AMPHREC_TABLE, aes(fill = REC_AMPH_REC, y = freq, x = TOB_FREQ_USE)) + geom_bar(position="fill", stat="identity") + theme_minimal() + labs(x = "Smoking Frequency", y = "Proportion", title = "Use of Non-Pharmaceutical Amphetamines by Smoking Frequency", subtitle = "(Taller bars indicate higher non-medical drug use %. Smoking group sample sizes shown.)") + scale_x_discrete(limits = positions1) + scale_fill_manual(values=my_color) + coord_cartesian(ylim = c(0, 0.25)) + geom_text(data = SMOKE_FREQ_TABLE, aes(x = TOB_FREQ_USE, y = 0.23125, label = number_cases), size = 5, colour = "white", inherit.aes = FALSE) + theme(axis.text.y = bold.text)
+smoke_amphrec_plot
+
+SMOKE_FENTREC_TABLE <- SMOKE_DRUGGRP %>% select(TOB_FREQ_USE, NPFENT) %>% group_by(TOB_FREQ_USE, NPFENT) %>% summarise(freq = n())
+
+smoke_fentrec_plot <- ggplot(SMOKE_FENTREC_TABLE, aes(fill = NPFENT, y = freq, x = TOB_FREQ_USE)) + geom_bar(position="fill", stat="identity") + theme_minimal() + labs(x = "Smoking Frequency", y = "Proportion", title = "Use of Non-Pharmaceutical Fentanyl by Smoking Frequency", subtitle = "(Taller bars indicate higher non-medical drug use %. Smoking group sample sizes shown.)") + scale_x_discrete(limits = positions1) + scale_fill_manual(values=my_color) + coord_cartesian(ylim = c(0, 0.25)) + geom_text(data = SMOKE_FREQ_TABLE, aes(x = TOB_FREQ_USE, y = 0.23125, label = number_cases), size = 5, colour = "white", inherit.aes = FALSE) + theme(axis.text.y = bold.text)
+smoke_fentrec_plot
+
+SMOKE_STERREC_TABLE <- SMOKE_DRUGGRP %>% select(TOB_FREQ_USE, STER) %>% group_by(TOB_FREQ_USE, STER) %>% summarise(freq = n())
+
+smoke_sterrec_plot <- ggplot(SMOKE_STERREC_TABLE, aes(fill = STER, y = freq, x = TOB_FREQ_USE)) + geom_bar(position="fill", stat="identity") + theme_minimal() + labs(x = "Smoking Frequency", y = "Proportion", title = "Use of Non-Prescribed Anabolic Steroids by Smoking Frequency", subtitle = "(Taller bars indicate higher non-medical drug use %. Smoking group sample sizes shown.)") + scale_x_discrete(limits = positions1) + scale_fill_manual(values=my_color) + coord_cartesian(ylim = c(0, 0.25)) + geom_text(data = SMOKE_FREQ_TABLE, aes(x = TOB_FREQ_USE, y = 0.23125, label = number_cases), size = 5, colour = "white", inherit.aes = FALSE) + theme(axis.text.y = bold.text)
+smoke_sterrec_plot
+```
+
+
+
+```{r}
+CA_NMU %>% select(ALC_FREQ_USE) %>% group_by(ALC_FREQ_USE) %>% summarise(n())
+
+DRINK_NMU_TABLE <- CA_NMU %>% select(ALC_FREQ_USE, NMU) %>% group_by(ALC_FREQ_USE, NMU) %>% summarise(freq = n())
+DRINK_NMU_TABLE$ALC_FREQ_USE[DRINK_NMU_TABLE$ALC_FREQ_USE == 1] <- "6-7/wk"
+DRINK_NMU_TABLE$ALC_FREQ_USE[DRINK_NMU_TABLE$ALC_FREQ_USE == 2] <- "4-5/wk"
+DRINK_NMU_TABLE$ALC_FREQ_USE[DRINK_NMU_TABLE$ALC_FREQ_USE == 3] <- "2-3/wk"
+DRINK_NMU_TABLE$ALC_FREQ_USE[DRINK_NMU_TABLE$ALC_FREQ_USE == 4] <- "1/wk"
+DRINK_NMU_TABLE$ALC_FREQ_USE[DRINK_NMU_TABLE$ALC_FREQ_USE == 5] <- "2-3/mth"
+DRINK_NMU_TABLE$ALC_FREQ_USE[DRINK_NMU_TABLE$ALC_FREQ_USE == 6] <- "1/mth"
+DRINK_NMU_TABLE$ALC_FREQ_USE[DRINK_NMU_TABLE$ALC_FREQ_USE == 7] <- "<1/mth"
+DRINK_NMU_TABLE$ALC_FREQ_USE[DRINK_NMU_TABLE$ALC_FREQ_USE == 8] <- "Never"
+
+DRINK_NMU_TABLE$NMU[DRINK_NMU_TABLE$NMU == 0] <- "No"
+DRINK_NMU_TABLE$NMU[DRINK_NMU_TABLE$NMU == 1] <- "Yes"
+
+positions2 <- c("Never", "<1/mth", "1/mth", "2-3/mth", "1/wk", "2-3/wk", "4-5/wk", "6-7/wk")
+
+generalFit2 <- glm(NMU ~ ALC_FREQ, family = binomial(link = "logit"), data = CA_NMU_fit)
+summary(generalFit2)
+
+```
+
+# Final Models for Drinking & Smoking and Model Comparisons
+
+```{r}
+generalFit4 <- glm(NMU ~ TOB_FREQ + ALC_FREQ, family = binomial(link = "logit"), data = CA_NMU_fit)
+summary(generalFit4)
+exp(confint(generalFit4))
+
+anova(generalFit, generalFit4, test = "Chisq")
+
+anova(generalFit2, generalFit4, test = "Chisq")
+
+```
+
+# Model Interpretation
+
+We have evidence that adding the predictor for alcohol frequency improves the model in both the first case based on solely smoking, and also in the second case based on solely alcohol. 
+
+The odds of an occasional smoker misusing any drug in their lifetime is 2.34 (e^0.85071) times the odds of a non-smoker misusing any drug. The odds of a daily smoker misusing any drug in their lifetime is 1.96 (e^0.67414) times the odds of a non-smoker misusing any drug.
+
+Similarly, the odds of a person drinking 4-5 times per week misusing any drug in their lifetime is 1.88 times the odds of a non-drinker misusing any drug. The odds of a daily drinker misusing any drug in their lifetime is 1.52 times the odds of a non-drinker misusing any drug.
+
+
+```{r}
+generalFit5 <- glm(NMU ~ TOB_FREQ + ALC_FREQ + DEM_GENDER, family = binomial(link = "logit"), data = CA_NMU_fit)
+summary(generalFit5)
+exp(confint(generalFit5))
+
+anova(generalFit4, generalFit5, test = "Chisq")
+```
+
+# Data Visualization for Drinking & Smoking Groups based on Gender
+
+```{r, warning=FALSE}
+SMOKE_NMU_GENDER_TABLE <- CA_NMU %>% select(DEM_GENDER, TOB_FREQ_USE, NMU) %>% group_by(DEM_GENDER, TOB_FREQ_USE, NMU) %>% summarise(freq = n())
+
+SMOKE_NMU_GENDER_TABLE$NMU[SMOKE_NMU_GENDER_TABLE$NMU == 0] <- "No"
+SMOKE_NMU_GENDER_TABLE$NMU[SMOKE_NMU_GENDER_TABLE$NMU == 1] <- "Yes"
+SMOKE_NMU_GENDER_TABLE$TOB_FREQ_USE[SMOKE_NMU_GENDER_TABLE$TOB_FREQ_USE == 1] <- "Every Day"
+SMOKE_NMU_GENDER_TABLE$TOB_FREQ_USE[SMOKE_NMU_GENDER_TABLE$TOB_FREQ_USE == 2] <- "Occasionally"
+SMOKE_NMU_GENDER_TABLE$TOB_FREQ_USE[SMOKE_NMU_GENDER_TABLE$TOB_FREQ_USE == 3] <- "Not At All"
+SMOKE_NMU_GENDER_TABLE$DEM_GENDER[SMOKE_NMU_GENDER_TABLE$DEM_GENDER == 1] <- "Male"
+SMOKE_NMU_GENDER_TABLE$DEM_GENDER[SMOKE_NMU_GENDER_TABLE$DEM_GENDER == 2] <- "Female"
+
+smoke_nmu_gender_plot <- ggplot(SMOKE_NMU_GENDER_TABLE, aes(fill = NMU, y = freq, x = TOB_FREQ_USE)) + geom_bar(position="fill", stat="identity") + theme_minimal() + labs(x = "Smoking Frequency", y = "Proportion", title = "Non-Medical Use of Any Drug by Smoking Frequency for Males vs. Females", subtitle = "(Taller bars indicate higher non-medical drug use %. Drinking group sample sizes shown.)") + scale_x_discrete(limits = positions1) + facet_wrap(~DEM_GENDER) + theme(axis.text.x = element_text(angle = 90)) + scale_fill_manual(values=my_color) + geom_text(data = SMOKE_GENDER_FREQ_TABLE, aes(x = TOB_FREQ_USE, y = 0.925, label = number_cases), size = 5, colour = "white", inherit.aes = FALSE)
+smoke_nmu_gender_plot
+
+
+
+DRINK_NMU_GENDER_TABLE <- CA_NMU %>% select(DEM_GENDER, ALC_FREQ_USE, NMU) %>% group_by(DEM_GENDER, ALC_FREQ_USE, NMU) %>% summarise(freq = n())
+
+DRINK_NMU_GENDER_TABLE$NMU[DRINK_NMU_GENDER_TABLE$NMU == 0] <- "No"
+DRINK_NMU_GENDER_TABLE$NMU[DRINK_NMU_GENDER_TABLE$NMU == 1] <- "Yes"
+DRINK_NMU_GENDER_TABLE$ALC_FREQ_USE[DRINK_NMU_GENDER_TABLE$ALC_FREQ_USE == 1] <- "6-7/wk"
+DRINK_NMU_GENDER_TABLE$ALC_FREQ_USE[DRINK_NMU_GENDER_TABLE$ALC_FREQ_USE == 2] <- "4-5/wk"
+DRINK_NMU_GENDER_TABLE$ALC_FREQ_USE[DRINK_NMU_GENDER_TABLE$ALC_FREQ_USE == 3] <- "2-3/wk"
+DRINK_NMU_GENDER_TABLE$ALC_FREQ_USE[DRINK_NMU_GENDER_TABLE$ALC_FREQ_USE == 4] <- "1/wk"
+DRINK_NMU_GENDER_TABLE$ALC_FREQ_USE[DRINK_NMU_GENDER_TABLE$ALC_FREQ_USE == 5] <- "2-3/mth"
+DRINK_NMU_GENDER_TABLE$ALC_FREQ_USE[DRINK_NMU_GENDER_TABLE$ALC_FREQ_USE == 6] <- "1/mth"
+DRINK_NMU_GENDER_TABLE$ALC_FREQ_USE[DRINK_NMU_GENDER_TABLE$ALC_FREQ_USE == 7] <- "<1/mth"
+DRINK_NMU_GENDER_TABLE$ALC_FREQ_USE[DRINK_NMU_GENDER_TABLE$ALC_FREQ_USE == 8] <- "Never"
+DRINK_NMU_GENDER_TABLE$DEM_GENDER[DRINK_NMU_GENDER_TABLE$DEM_GENDER == 1] <- "Male"
+DRINK_NMU_GENDER_TABLE$DEM_GENDER[DRINK_NMU_GENDER_TABLE$DEM_GENDER == 2] <- "Female"
+
+
+drink_nmu_gender_plot <- ggplot(DRINK_NMU_GENDER_TABLE, aes(fill = NMU, y = freq, x = ALC_FREQ_USE)) + geom_bar(position="fill", stat="identity") + theme_minimal() + labs(x = "Drinking Frequency", y = "Proportion", title = "Non-Medical Use of Any Drug by Drinking Frequency for Males vs. Females", subtitle = "(Taller bars indicate higher non-medical drug use %. Drinking group sample sizes shown.)") + scale_x_discrete(limits = positions2) + facet_wrap(~DEM_GENDER) + theme(axis.text.x = element_text(angle = 90)) + scale_fill_manual(values=my_color) + geom_text(data = DRINK_GENDER_FREQ_TABLE, aes(x = ALC_FREQ_USE, y = 0.925, label = number_cases), size = 3, colour = "white", inherit.aes = FALSE)
+drink_nmu_gender_plot
+```
+
+# Data Visualizations for Drinking Groups
+
+```{r}
+DRINK_RELI_TABLE <- SMOKE_DRUGGRP %>% select(ALC_FREQ_USE, RELI_NMU) %>% group_by(ALC_FREQ_USE, RELI_NMU) %>% summarise(freq = n())
+
+drink_nmu_plot <- ggplot(DRINK_NMU_TABLE, aes(fill = NMU, y = freq, x = ALC_FREQ_USE)) + geom_bar(position="fill", stat="identity") + theme_minimal() + labs(x = "Drinking Frequency", y = "Proportion", title = "Non-Medical Use of Any Drug by Drinking Frequency", subtitle = "(Taller bars indicate higher non-medical drug use %. Drinking group sample sizes shown.)") + scale_x_discrete(limits = positions2) + scale_fill_manual(values=my_color) + geom_text(data = DRINK_FREQ_TABLE, aes(x = ALC_FREQ_USE, y = 0.925, label = number_cases), size = 3, colour = "white", inherit.aes = FALSE)
+drink_nmu_plot
+
+drink_reli_plot <- ggplot(DRINK_RELI_TABLE, aes(fill = RELI_NMU, y = freq, x = ALC_FREQ_USE)) + geom_bar(position="fill", stat="identity") + theme_minimal() + labs(x = "Drinking Frequency", y = "Proportion", title = "Non-Medical Use of Prescribed Analgesics by Drinking Frequency", subtitle = "(Taller bars indicate higher non-medical drug use %. Drinking group sample sizes shown.)") + scale_x_discrete(limits = positions2) + scale_fill_manual(values=my_color) + geom_text(data = DRINK_FREQ_TABLE, aes(x = ALC_FREQ_USE, y = 0.925, label = number_cases), size = 3, colour = "white", inherit.aes = FALSE)
+drink_reli_plot
+
+DRINK_STIM_TABLE <- SMOKE_DRUGGRP %>% select(ALC_FREQ_USE, STIM_NMU) %>% group_by(ALC_FREQ_USE, STIM_NMU) %>% summarise(freq = n())
+
+drink_stim_plot <- ggplot(DRINK_STIM_TABLE, aes(fill = STIM_NMU, y = freq, x = ALC_FREQ_USE)) + geom_bar(position="fill", stat="identity") + theme_minimal() + labs(x = "Drinking Frequency", y = "Proportion", title = "Non-Medical Use of Prescribed Stimulants by Drinking Frequency", subtitle = "(Taller bars indicate higher non-medical drug use %. Drinking group sample sizes shown.)") + scale_x_discrete(limits = positions2) + scale_fill_manual(values=my_color) + geom_text(data = DRINK_FREQ_TABLE, aes(x = ALC_FREQ_USE, y = 0.04625, label = number_cases), size = 3, colour = "white", inherit.aes = FALSE) + theme(axis.text.y = bold.text) + coord_cartesian(ylim = c(0, 0.05))
+drink_stim_plot
+
+DRINK_BENZ_TABLE <- SMOKE_DRUGGRP %>% select(ALC_FREQ_USE, BENZ_NMU) %>% group_by(ALC_FREQ_USE, BENZ_NMU) %>% summarise(freq = n())
+
+drink_benz_plot <- ggplot(DRINK_BENZ_TABLE, aes(fill = BENZ_NMU, y = freq, x = ALC_FREQ_USE)) + geom_bar(position="fill", stat="identity") + theme_minimal() + labs(x = "Drinking Frequency", y = "Proportion", title = "Non-Medical Use of Prescribed Benzodiazapines by Drinking Frequency", subtitle = "(Taller bars indicate higher non-medical drug use %. Drinking group sample sizes shown.)") + scale_x_discrete(limits = positions2) + scale_fill_manual(values=my_color) + geom_text(data = DRINK_FREQ_TABLE, aes(x = ALC_FREQ_USE, y = 0.04625, label = number_cases), size = 3, colour = "white", inherit.aes = FALSE) + theme(axis.text.y = bold.text) + coord_cartesian(ylim = c(0, 0.05))
+drink_benz_plot
+
+DRINK_CANREC_TABLE <- SMOKE_DRUGGRP %>% select(ALC_FREQ_USE, REC_CAN_REC) %>% group_by(ALC_FREQ_USE, REC_CAN_REC) %>% summarise(freq = n())
+
+drink_canrec_plot<- ggplot(DRINK_CANREC_TABLE, aes(fill = REC_CAN_REC, y = freq, x = ALC_FREQ_USE)) + geom_bar(position="fill", stat="identity") + theme_minimal() + labs(x = "Drinking Frequency", y = "Proportion", title = "Non-Medical Use of Non-Prescribed Cannabis by Drinking Frequency", subtitle = "(Taller bars indicate higher non-medical drug use %. Drinking group sample sizes shown.)") + scale_x_discrete(limits = positions2) + scale_fill_manual(values=my_color) + geom_text(data = DRINK_FREQ_TABLE, aes(x = ALC_FREQ_USE, y = 0.925, label = number_cases), size = 3, colour = "white", inherit.aes = FALSE)
+drink_canrec_plot
+
+DRINK_AMPHREC_TABLE <- SMOKE_DRUGGRP %>% select(ALC_FREQ_USE, REC_AMPH_REC) %>% group_by(ALC_FREQ_USE, REC_AMPH_REC) %>% summarise(freq = n())
+
+
+drink_amphrec_plot <- ggplot(DRINK_AMPHREC_TABLE, aes(fill = REC_AMPH_REC, y = freq, x = ALC_FREQ_USE)) + geom_bar(position="fill", stat="identity") + theme_minimal() + labs(x = "Drinking Frequency", y = "Proportion", title = "Use of Non-Pharmaceutical Amphetamines by Drinking Frequency", subtitle = "(Taller bars indicate higher non-medical drug use %. Drinking group sample sizes shown.)") + scale_x_discrete(limits = positions2) + scale_fill_manual(values=c("#4c4c4c", "#86BB8D", "#68a4bd", "#ff9900", "plum")) + theme(axis.text.x = element_text(angle = 90)) + scale_fill_manual(values=my_color) + geom_text(data = DRINK_FREQ_TABLE, aes(x = ALC_FREQ_USE, y = 0.23125, label = number_cases), size = 3, colour = "white", inherit.aes = FALSE) + theme(axis.text.y = bold.text) + coord_cartesian(ylim = c(0, 0.25))
+drink_amphrec_plot
+```
+
+# A Closer Look at Non-Pharma Amphetamine Use by Drinking Group & Gender
+
+```{r}
+DRINK_AMPHREC_TABLE_GENDER <- SMOKE_DRUGGRP %>% select(DEM_GENDER, ALC_FREQ_USE, REC_AMPH_REC) %>% group_by(DEM_GENDER, ALC_FREQ_USE, REC_AMPH_REC) %>% summarise(freq = n())
+DRINK_AMPHREC_TABLE_GENDER
+
+DRINK_AMPHREC_TABLE_GENDER$DEM_GENDER[DRINK_AMPHREC_TABLE_GENDER$DEM_GENDER == 1] <- "Male"
+DRINK_AMPHREC_TABLE_GENDER$DEM_GENDER[DRINK_AMPHREC_TABLE_GENDER$DEM_GENDER == 2] <- "Female"
+
+drink_amphrec_gender_plot <- ggplot(DRINK_AMPHREC_TABLE_GENDER, aes(fill = REC_AMPH_REC, y = freq, x = ALC_FREQ_USE)) + geom_bar(position="fill", stat="identity") + theme_minimal() + labs(x = "Drinking Frequency", y = "Proportion", title = "Non-Pharmaceutical Amphetamine Use by Drinking Frequency for M vs. F", subtitle = "(Taller bars indicate higher non-medical drug use %. Drinking group sample sizes shown.)") + scale_x_discrete(limits = positions2) + facet_wrap(~DEM_GENDER) + scale_fill_manual(values=my_color) + theme(axis.text.x = element_text(angle = 90)) + scale_fill_manual(values=my_color) + geom_text(data = DRINK_GENDER_FREQ_TABLE, aes(x = ALC_FREQ_USE, y = 0.2775, label = number_cases), size = 2, colour = "white", inherit.aes = FALSE) + theme(axis.text.y = bold.text) + coord_cartesian(ylim = c(0, 0.3))
+drink_amphrec_gender_plot
+
+
+```
+
+# Separate: Model Fitting for OPIOID and CODEINE
+
+```{r}
+generalFit3 <- glm(NMU ~ OP_USE + COD_USE, family = binomial(link = "logit"), data = CA_NMU_fit)
+#summary(generalFit3)
+
+generalFit6 <- glm(NMU ~ OP_USE, family = binomial(link = "logit"), data = CA_NMU_fit)
+#summary(generalFit6)
+
+generalFit7 <- glm(NMU ~ COD_USE, family = binomial(link = "logit"), data = CA_NMU_fit)
+#summary(generalFit7)
+
+anova(generalFit6, generalFit3, test = "Chisq")
+anova(generalFit7, generalFit3, test = "Chisq")
+```
+
+The drop-in-deviance for adding codeine use to our original opioid model was less than the drop-in-deviance for adding opioid use to our original codeine model. This is expected since opioid use was the best predictor of NMU based on our answer to the first question. 
+
+Further variables are added according to their Mutual Information Scores below.
+
+```{r}
+generalFit8 <- glm(NMU ~ OP_USE + COD_USE + NPFENT, family = binomial(link = "logit"), data = CA_NMU_fit)
+#summary(generalFit8)
+
+anova(generalFit3, generalFit8, test = "Chisq")
+
+generalFit9 <- glm(NMU ~ OP_USE + COD_USE + NPFENT + DAST_SUM, family = binomial(link = "logit"), data = CA_NMU_fit)
+#summary(generalFit9)
+
+anova(generalFit8, generalFit9, test = "Chisq")
+```
+
+```{r}
+generalFit10 <- glm(NMU ~ OP_USE + COD_USE + NPFENT + DAST_SUM + GHB, family = binomial(link = "logit"), data = CA_NMU_fit)
+#summary(generalFit10)
+
+anova(generalFit9, generalFit10, test = "Chisq")
+
+generalFit11 <- glm(NMU ~ OP_USE + COD_USE + NPFENT + DAST_SUM + GHB + HEROIN, family = binomial(link = "logit"), data = CA_NMU_fit)
+#summary(generalFit11)
+
+anova(generalFit10, generalFit11, test = "Chisq")
+
+generalFit12 <- glm(NMU ~ OP_USE + COD_USE + NPFENT + DAST_SUM + GHB + HEROIN + SPICE, family = binomial(link = "logit"), data = CA_NMU_fit)
+#summary(generalFit12)
+
+anova(generalFit11, generalFit12, test = "Chisq")
+
+generalFit13 <- glm(NMU ~ OP_USE + COD_USE + NPFENT + DAST_SUM + GHB + HEROIN + SPICE + STIM_USE, family = binomial(link = "logit"), data = CA_NMU_fit)
+#summary(generalFit13)
+
+anova(generalFit11, generalFit13, test = "Chisq")
+
+generalFit14 <- glm(NMU ~ OP_USE + COD_USE + NPFENT + DAST_SUM + GHB + HEROIN + SPICE + STIM_USE + SAL, family = binomial(link = "logit"), data = CA_NMU_fit)
+#summary(generalFit14)
+
+anova(generalFit13, generalFit14, test = "Chisq")
+
+generalFit17 <- glm(NMU ~ OP_USE + COD_USE + NPFENT + DAST_SUM + GHB + HEROIN + SPICE + STIM_USE + SAL + SPEED, family = binomial(link = "logit"), data = CA_NMU_fit)
+#summary(generalFit17)
+
+anova(generalFit13, generalFit17, test = "Chisq")
+
+
+#Below are extra tests to see if any simpler models were better than the model including STIM_USE
+
+
+
+
+#anova(generalFit10, generalFit13, test = "Chisq")
+
+#generalFit15 <- glm(NMU ~ OP_USE + COD_USE + DAST_SUM + GHB + HEROIN, family = binomial(link = "logit"), data = CA_NMU_fit)
+#summary(generalFit15)
+
+#anova(generalFit15, generalFit13, test = "Chisq")
+
+#anova(generalFit9, generalFit13, test = "Chisq")
+
+#generalFit16 <- glm(NMU ~ OP_USE + DAST_SUM, family = binomial(link = "logit"), data = CA_NMU_fit)
+#summary(generalFit15)
+
+#anova(generalFit16, generalFit13, test = "Chisq")
+```
+
+# Final Model & Interpretations
+
+
+
+
+
